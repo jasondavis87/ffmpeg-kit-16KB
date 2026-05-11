@@ -11,6 +11,91 @@ NDK : <a href="https://ci.android.com/builds/branches/aosp-ndk-release-r23/grid"
 You can find all details related to this update here. https://developer.android.com/guide/practices/page-sizes
 </br>
 
+## Local fork customizations
+
+This fork (`jasondavis87/ffmpeg-kit-16KB`) carries the following changes on top of the upstream 16KB fork. Each was needed to build under a modern macOS toolchain (Xcode 26 / iPhoneOS 26.4 SDK + CMake 4.x + recent Homebrew gettext).
+
+| Change | File(s) | Why |
+|---|---|---|
+| Bump libpng `v1.6.40` → `v1.6.58` | `scripts/source.sh`, `scripts/apple/libpng.sh` | libpng 1.6.40's `pngpriv.h` includes `<fp.h>` (legacy Mac Carbon header, absent from modern iPhoneOS SDKs) under `defined(TARGET_OS_MAC)`. Fixed in 1.6.41+. iOS arm64 build fails without this. |
+| Export `CMAKE_POLICY_VERSION_MINIMUM=3.5` | `ios.sh`, `android.sh` | CMake 4.0+ removed compat for `cmake_minimum_required(VERSION < 3.5)`. Several pinned libs in this fork (soxr 0.1.3, jpeg, snappy, libilbc, libvidstab, libaom, x265, chromaprint, srt) still declare older minimums. Setting this env var at the entrypoint propagates the workaround to every child cmake call. |
+| Remove bogus `ARCH=x86` early-return in `scripts/android/openssl.sh` | `scripts/android/openssl.sh` | The guard had comment "openssl does not support 32-bit apple architectures" — but this is the **Android** script; copy-paste bug from `scripts/apple/openssl.sh`. The case statement below already had valid Configure args for android-x86. Without this fix, openssl fails to build for the Android x86 emulator slice. |
+| Swap gnutls → openssl for TLS | (build flag choice, not a source edit) | gnutls's bootstrap requires older gettext/autopoint than Homebrew ships. openssl 3.1.1 uses its own `./Configure` (no autotools/autopoint), builds cleanly. Both provide HTTPS for ffmpeg. |
+
+### Build prerequisites (macOS, Apple Silicon)
+
+In addition to the upstream requirements listed in [`android/README.md`](android/README.md):
+
+```bash
+brew install autoconf automake libtool pkg-config nasm yasm cmake meson ninja gperf groff
+```
+
+`groff` is specifically needed by libiconv (cascades from `--enable-libass` on Android). Without it, libiconv's `make` step fails on the manpage-HTML target.
+
+### Build commands used for the current bundled binaries
+
+These are the exact invocations that produce the binaries shipped in `jasondavis87/ffmpeg-kit-react-native` (`ios/Frameworks/*.xcframework` and `android/libs/ffmpeg-kit.aar`):
+
+```bash
+# iOS — Xcode 26 / iPhoneOS 26.4 SDK
+./ios.sh -x \
+  --enable-ios-videotoolbox \
+  --enable-ios-audiotoolbox \
+  --enable-ios-zlib \
+  --disable-arm64e \
+  --enable-libass \
+  --enable-openh264 \
+  --enable-openssl \
+  --enable-lame \
+  --enable-opus \
+  --enable-libvpx \
+  --enable-dav1d \
+  --enable-libvorbis \
+  --enable-libwebp \
+  --enable-soxr
+
+# Android — NDK 25.2.9519653 (16KB-capable; do NOT use r27/r28)
+export ANDROID_SDK_ROOT=$HOME/Library/Android/sdk
+export ANDROID_NDK_ROOT=$HOME/Library/Android/sdk/ndk/25.2.9519653
+
+./android.sh \
+  --enable-android-media-codec \
+  --enable-android-zlib \
+  --enable-libass \
+  --enable-openh264 \
+  --enable-openssl \
+  --enable-lame \
+  --enable-opus \
+  --enable-libvpx \
+  --enable-dav1d \
+  --enable-libvorbis \
+  --enable-libwebp \
+  --enable-soxr
+```
+
+`--enable-libass` cascades to freetype, fribidi, fontconfig, harfbuzz, expat, libpng (and libiconv + libuuid on Android — virtual on iOS). `--enable-libwebp` cascades to jpeg, tiff, giflib, libpng (the cascade gives FFmpeg's `overlay` filter universal image-format support: PNG/JPG/GIF/TIFF/WebP).
+
+Build output:
+- iOS: `prebuilt/bundle-apple-xcframework-ios/*.xcframework` (8 xcframeworks)
+- Android: `prebuilt/bundle-android-aar/ffmpeg-kit/ffmpeg-kit.aar` (~65 MB)
+
+Resulting ffmpeg capabilities embedded in `libavfilter.so` / the ffmpegkit dylib:
+
+```
+--enable-libass        --enable-libfreetype   --enable-libdav1d
+--enable-libfontconfig --enable-libfribidi    --enable-libmp3lame
+--enable-libopenh264   --enable-libopus       --enable-libsoxr
+--enable-libvorbis     --enable-libvpx        --enable-libwebp
+--enable-openssl       --enable-iconv         --enable-mediacodec
+                       --enable-videotoolbox  --enable-audiotoolbox
+```
+
+### Notes on what is intentionally NOT enabled
+
+- **GPL libs** (`--enable-gpl` and `x264`, `x265`, `xvidcore`, `libvidstab`, `rubberband`) — kept out so the bundled binaries stay LGPL.
+- **kvazaar** (HEVC software encode, LGPL) — VideoToolbox (iOS) and MediaCodec (Android) handle HEVC in hardware on capable devices; software encode is slow on mobile.
+- **libaom** (AV1 encode) — multi-MB and very slow on mobile. AV1 decode is covered by dav1d.
+
 # FFmpegKit ![GitHub release](https://img.shields.io/badge/release-v6.0-blue.svg) ![Maven Central](https://img.shields.io/maven-central/v/com.arthenica/ffmpeg-kit-min) ![CocoaPods](https://img.shields.io/cocoapods/v/ffmpeg-kit-ios-min) ![pub](https://img.shields.io/pub/v/ffmpeg_kit_flutter.svg) ![npm](https://img.shields.io/npm/v/ffmpeg-kit-react-native.svg)
 
 ## Notice
