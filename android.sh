@@ -13,6 +13,9 @@ fi
 # LOAD INITIAL SETTINGS
 export BASEDIR="$(pwd)"
 export FFMPEG_KIT_BUILD_TYPE="android"
+# Allow cmake 4.x to honor legacy cmake_minimum_required(< 3.5) declarations
+# in pinned external library sources (e.g. soxr 0.1.3, jpeg, snappy, libilbc).
+export CMAKE_POLICY_VERSION_MINIMUM=3.5
 source "${BASEDIR}"/scripts/variable.sh
 source "${BASEDIR}"/scripts/function-${FFMPEG_KIT_BUILD_TYPE}.sh
 disabled_libraries=()
