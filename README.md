@@ -32,69 +32,9 @@ brew install autoconf automake libtool pkg-config nasm yasm cmake meson ninja gp
 
 `groff` is specifically needed by libiconv (cascades from `--enable-libass` on Android). Without it, libiconv's `make` step fails on the manpage-HTML target.
 
-### Build commands used for the current bundled binaries
+### Consumer of this fork's binaries
 
-These are the exact invocations that produce the binaries shipped in `jasondavis87/ffmpeg-kit-react-native` (`ios/Frameworks/*.xcframework` and `android/libs/ffmpeg-kit.aar`):
-
-```bash
-# iOS — Xcode 26 / iPhoneOS 26.4 SDK
-./ios.sh -x \
-  --enable-ios-videotoolbox \
-  --enable-ios-audiotoolbox \
-  --enable-ios-zlib \
-  --disable-arm64e \
-  --enable-libass \
-  --enable-openh264 \
-  --enable-openssl \
-  --enable-lame \
-  --enable-opus \
-  --enable-libvpx \
-  --enable-dav1d \
-  --enable-libvorbis \
-  --enable-libwebp \
-  --enable-soxr
-
-# Android — NDK 25.2.9519653 (16KB-capable; do NOT use r27/r28)
-export ANDROID_SDK_ROOT=$HOME/Library/Android/sdk
-export ANDROID_NDK_ROOT=$HOME/Library/Android/sdk/ndk/25.2.9519653
-
-./android.sh \
-  --enable-android-media-codec \
-  --enable-android-zlib \
-  --enable-libass \
-  --enable-openh264 \
-  --enable-openssl \
-  --enable-lame \
-  --enable-opus \
-  --enable-libvpx \
-  --enable-dav1d \
-  --enable-libvorbis \
-  --enable-libwebp \
-  --enable-soxr
-```
-
-`--enable-libass` cascades to freetype, fribidi, fontconfig, harfbuzz, expat, libpng (and libiconv + libuuid on Android — virtual on iOS). `--enable-libwebp` cascades to jpeg, tiff, giflib, libpng (the cascade gives FFmpeg's `overlay` filter universal image-format support: PNG/JPG/GIF/TIFF/WebP).
-
-Build output:
-- iOS: `prebuilt/bundle-apple-xcframework-ios/*.xcframework` (8 xcframeworks)
-- Android: `prebuilt/bundle-android-aar/ffmpeg-kit/ffmpeg-kit.aar` (~65 MB)
-
-Resulting ffmpeg capabilities embedded in `libavfilter.so` / the ffmpegkit dylib:
-
-```
---enable-libass        --enable-libfreetype   --enable-libdav1d
---enable-libfontconfig --enable-libfribidi    --enable-libmp3lame
---enable-libopenh264   --enable-libopus       --enable-libsoxr
---enable-libvorbis     --enable-libvpx        --enable-libwebp
---enable-openssl       --enable-iconv         --enable-mediacodec
-                       --enable-videotoolbox  --enable-audiotoolbox
-```
-
-### Notes on what is intentionally NOT enabled
-
-- **GPL libs** (`--enable-gpl` and `x264`, `x265`, `xvidcore`, `libvidstab`, `rubberband`) — kept out so the bundled binaries stay LGPL.
-- **kvazaar** (HEVC software encode, LGPL) — VideoToolbox (iOS) and MediaCodec (Android) handle HEVC in hardware on capable devices; software encode is slow on mobile.
-- **libaom** (AV1 encode) — multi-MB and very slow on mobile. AV1 decode is covered by dav1d.
+This fork is used to build the iOS xcframeworks and Android AAR bundled in [`jasondavis87/ffmpeg-kit-react-native-local`](https://github.com/jasondavis87/ffmpeg-kit-react-native-local). See that repo's README for the specific `--enable-*` flag set used and the rationale behind which external libraries are turned on.
 
 # FFmpegKit ![GitHub release](https://img.shields.io/badge/release-v6.0-blue.svg) ![Maven Central](https://img.shields.io/maven-central/v/com.arthenica/ffmpeg-kit-min) ![CocoaPods](https://img.shields.io/cocoapods/v/ffmpeg-kit-ios-min) ![pub](https://img.shields.io/pub/v/ffmpeg_kit_flutter.svg) ![npm](https://img.shields.io/npm/v/ffmpeg-kit-react-native.svg)
 
